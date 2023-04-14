@@ -1,116 +1,136 @@
 package dev.expo.analysisbot.commands
 
-import com.google.gson.Gson
-import com.google.gson.JsonArray
-import com.google.gson.JsonElement
-import dev.expo.analysisbot.AnalysisBot
-import dev.expo.analysisbot.util.get
+import dev.expo.analysisbot.tbadata.ChargedUpMatch.ChargedUpMatch
+import dev.expo.analysisbot.tbainterface.Alliance
+import dev.expo.analysisbot.tbainterface.JsonToPojo
+import dev.expo.analysisbot.tbainterface.TBA
+import dev.expo.analysisbot.tbainterface.allianceOf
 import net.dv8tion.jda.api.EmbedBuilder
-import net.dv8tion.jda.api.events.message.MessageReceivedEvent
+import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent
 import net.dv8tion.jda.api.hooks.ListenerAdapter
-import okhttp3.OkHttpClient
-import okhttp3.Request
+import net.dv8tion.jda.api.interactions.commands.OptionType
+import net.dv8tion.jda.api.interactions.commands.build.Commands
+import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData
 import java.awt.Color
 
 
-class TotalScoredGPAlliance : ListenerAdapter() {
-    private fun arraysToEmbed(
-        array: Array<Array<Double>>, description: String, builder: EmbedBuilder
-    ) {
-        val sb = StringBuilder()
-        sb.append("```fix\n")
-        sb.append("${array[0].toFormattedDecimal()}\n")
-        sb.append("${array[1].toFormattedDecimal()}\n")
-        sb.append("${array[2].toFormattedDecimal()}\n")
-        sb.append("```")
+object TotalScoredGPAlliance : ListenerAdapter() {
+    override fun onSlashCommandInteraction(event: SlashCommandInteractionEvent) {
+        if (event.name != "totalgpalliance" || event.options[0] == null) return
 
-        builder.addField(description, sb.toString(), false)
-    }
+        val teamNumber = event.options[0].asInt
+
+        val emptyArray = arrayOf(
+            arrayOf(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            arrayOf(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            arrayOf(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        )
+        val auto = cloneArray(emptyArray)
+        val teleop = cloneArray(emptyArray)
+        val total = cloneArray(emptyArray)
+
+        val eventKey = event.getOption("eventname")?.asString?.let { TBA.getEventKey(it, 2023) }
+
+        val allMatches = if (eventKey != null) {
+            TBA.getJson("team/frc$teamNumber/event/$eventKey/matches")
+        } else {
+            TBA.getJson("team/frc$teamNumber/matches/2023")
+        }.asJsonArray
 
 
-    override fun onMessageReceived(event: MessageReceivedEvent) {
-        if (event.author.isBot) return
 
-        val message = event.message
-        val content = message.contentRaw.split(' ')
-        val teamNumber = content[1]
+        for (matchData in allMatches) {
+            val match = ChargedUpMatch()
+            JsonToPojo.populate(matchData.asJsonObject, match)
 
-        if (content[0] == "!totalScoredGPAlliance") {
-            val emptyArray = arrayOf(
-                arrayOf(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-                arrayOf(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-                arrayOf(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-            )
-            val auto = cloneArray(emptyArray)
-            val teleop = cloneArray(emptyArray)
-            val total = cloneArray(emptyArray)
+            val alliance = match.allianceOf(teamNumber)
 
-            val allMatches = if (content.size > 2) {
-                pollTBA("team/frc$teamNumber/event/2023${content[2]}/matches")
+            val autoScores: Array<List<String>>
+            val teleopScores: Array<List<String>>
+
+            if (alliance == Alliance.BLUE) {
+                val autoData = match.scoreBreakdown.blue.autoCommunity
+                autoScores = arrayOf(autoData.t, autoData.m, autoData.b)
+
+                val teleopData = match.scoreBreakdown.blue.teleopCommunity
+                teleopScores = arrayOf(teleopData.t, teleopData.m, teleopData.b)
             } else {
-                pollTBA("team/frc$teamNumber/matches/2023")
-            }.asJsonArray.asList()
+                val autoData = match.scoreBreakdown.red.autoCommunity
+                autoScores = arrayOf(autoData.t, autoData.m, autoData.b)
 
+                val teleopData = match.scoreBreakdown.red.teleopCommunity
+                teleopScores = arrayOf(teleopData.t, teleopData.m, teleopData.b)
+            }
 
-            for (matchNumber in allMatches.indices) {
-                val match = allMatches[matchNumber]
-
-                val alliance = getAlliance(match, teamNumber.toInt())
-
-                val scoredGPAuto = match.get("score_breakdown").get(alliance).get("autoCommunity")
-                val scoredGPTeleop = match.get("score_breakdown").get(alliance).get("teleopCommunity")
-
-                val autoScores = arrayOf(
-                    scoredGPAuto.get("T").asJsonArray.asList(),
-                    scoredGPAuto.get("M").asJsonArray.asList(),
-                    scoredGPAuto.get("B").asJsonArray.asList()
-                )
-
-                for (i in 0..2) {
-                    for (j in 0..8) {
-                        val gpName = autoScores[i][j].asString
-                        if (gpName != "None") {
-                            auto[i][j] += 1.0
-                            // Counter the fact that the teleop scores count everything scored in auto as well
-                            teleop[i][j] -= 1.0
-                        }
+            for (i in 0..2) {
+                for (j in 0..8) {
+                    val autoGPState = autoScores[i][j]
+                    val teleopGPState = teleopScores[i][j]
+                    if (autoGPState != "None") {
+                        auto[i][j] += 1.0
+                        // Counter the fact that the teleop scores count everything scored in auto as well
+                        teleop[i][j] -= 1.0
                     }
-                }
-
-                val teleopScores = arrayOf(
-                    scoredGPTeleop.get("T").asJsonArray.asList(),
-                    scoredGPTeleop.get("M").asJsonArray.asList(),
-                    scoredGPTeleop.get("B").asJsonArray.asList()
-                )
-
-                for (i in 0..2) {
-                    for (j in 0..8) {
-                        val gpName = teleopScores[i][j].asString
-                        if (gpName != "None") {
-                            teleop[i][j] += 1.0
-                            total[i][j] += 1.0
-                        }
+                    if (teleopGPState != "None") {
+                        teleop[i][j] += 1.0
+                        total[i][j] += 1.0
                     }
                 }
             }
-
-            val matchesPlayed = allMatches.size
-
-            val embed = EmbedBuilder()
-            arraysToEmbed(auto, "Auto", embed)
-            arraysToEmbed(teleop, "Tele", embed)
-            arraysToEmbed(total, "Total", embed)
-            arraysToEmbed(averageArray(total, matchesPlayed), "Avg", embed)
-
-            embed.setImage("https://frcavatars.herokuapp.com/get_image?team=$teamNumber")
-            embed.setTitle("Alliance GP totals for team $teamNumber")
-            embed.setDescription("All game pieces scored by alliances including team $teamNumber across $matchesPlayed matches")
-            embed.setColor(Color(0x3fa3cc))
-
-            val channel = event.channel
-
-            channel.sendMessageEmbeds(embed.build()).queue()
         }
+
+        val matchesPlayed = allMatches.size()
+
+        val embed = EmbedBuilder()
+        arrayToEmbed(auto, "Auto", embed)
+        arrayToEmbed(teleop, "Tele", embed)
+        arrayToEmbed(total, "Total", embed)
+        arrayToEmbed(averageArray(total, matchesPlayed), "Avg", embed)
+
+        embed.setImage("https://frcavatars.herokuapp.com/get_image?team=$teamNumber")
+        embed.setTitle("Alliance GP totals for team $teamNumber")
+        embed.setDescription("All game pieces scored by alliances including team $teamNumber across $matchesPlayed matches")
+        embed.setColor(Color(0x3fa3cc))
+
+        event.replyEmbeds(embed.build()).queue()
+    }
+
+    override fun onCommandAutoCompleteInteraction(event: CommandAutoCompleteInteractionEvent) {
+        if (!(event.name == "totalgpalliance" && event.focusedOption.name == "eventname")) return
+
+        val events = TBA.getJson("team/frc${event.options[0].asInt}/events/2023/simple").asJsonArray
+
+        val names = mutableListOf<String>()
+        for (e in events) {
+            names.add(e.asJsonObject.get("name").asString)
+        }
+
+        var suggestions = names.filter { it.startsWith(event.focusedOption.value, true) }
+        if (suggestions.size > 25) suggestions = suggestions.subList(0, 25)
+
+        event.replyChoiceStrings(suggestions).queue()
+    }
+
+    fun getSlashCommand(): SlashCommandData {
+        val command = Commands.slash(
+            "totalgpalliance", "Gets the total game pieces scored by alliances including a specified team"
+        )
+
+        command.addOption(OptionType.INTEGER, "teamnum", "Team Number to get data of", true)
+        command.addOption(OptionType.STRING, "eventname", "Name of an event to get data from", false, true)
+        return command
+    }
+
+    private fun arrayToEmbed(array: Array<Array<Double>>, description: String, builder: EmbedBuilder) {
+        val sb = StringBuilder()
+        sb.append("```fix\n")
+        sb.append("${doubleArrayToString(array[0])}\n")
+        sb.append("${doubleArrayToString(array[1])}\n")
+        sb.append("${doubleArrayToString(array[2])}\n")
+        sb.append("```")
+
+        builder.addField(description, sb.toString(), false)
     }
 
     private fun cloneArray(array: Array<Array<Double>>): Array<Array<Double>> {
@@ -131,42 +151,19 @@ class TotalScoredGPAlliance : ListenerAdapter() {
         return output
     }
 
-    private fun getAlliance(match: JsonElement, teamNumber: Int): String {
-        val blueTeamData = match.get("alliances").get("blue").get("team_keys").asJsonArray.asList()
-        for (i in blueTeamData.indices) {
-            val currentTeam = blueTeamData.elementAt(i)
-            if (currentTeam.asString == "frc$teamNumber") return "blue"
+    private fun doubleArrayToString(array: Array<Double>): String {
+        val sb = StringBuilder()
 
+        for (i in array) {
+            var num = i.toString()
+            if (num.substring(0, num.indexOf(".")).length == 1) num = "0$num"
+            if (num.length > 4) num = num.substring(0, 5)
+            if (num.substring(num.indexOf(".")).length == 2) num = "${num}0"
+            sb.append(num)
+            sb.append("|")
         }
-        return "red"
+
+        return "[${sb.toString().removeSuffix("|")}]"
     }
 
-    private fun pollTBA(field: String): JsonArray {
-        val url = "https://www.thebluealliance.com/api/v3/${field}"
-
-        val client = OkHttpClient()
-
-        val request = Request.Builder().url(url).header("X-TBA-Auth-Key", AnalysisBot.config.tbaApiKey).build()
-
-        val response = client.newCall(request).execute()
-        val jsonString = response.body?.string() ?: "null"
-
-        return Gson().fromJson(jsonString, JsonArray::class.java)
-    }
-
-}
-
-private fun Array<Double>.toFormattedDecimal(): String {
-    val sb = StringBuilder()
-
-    for (i in this) {
-        var num = i.toString()
-        if (num.substring(0, num.indexOf(".")).length == 1) num = "0$num"
-        if (num.length > 4) num = num.substring(0, 5)
-        if (num.substring(num.indexOf(".")).length == 2) num = "${num}0"
-        sb.append(num)
-        sb.append("|")
-    }
-
-    return "[${sb.toString().removeSuffix("|")}]"
 }
