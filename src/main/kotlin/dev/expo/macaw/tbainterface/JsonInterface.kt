@@ -1,4 +1,4 @@
-package dev.expo.analysisbot.tbainterface
+package dev.expo.macaw.tbainterface
 
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -19,7 +19,7 @@ object JsonInterface {
     fun generateClass(key: String, className: String) {
         val source = TBA.getJsonString(key)
 
-        mapper.generate(model, className, "dev.expo.analysisbot.tbadata.$className", source)
+        mapper.generate(model, className, "dev.expo.macaw.tbadata.$className", source)
 
         val destination = File("src/main/java")
         destination.mkdirs()

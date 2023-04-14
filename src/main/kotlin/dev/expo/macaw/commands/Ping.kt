@@ -1,4 +1,4 @@
-package dev.expo.analysisbot.commands
+package dev.expo.macaw.commands
 
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import net.dv8tion.jda.api.hooks.ListenerAdapter

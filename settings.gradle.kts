@@ -1,3 +1,3 @@
 
-rootProject.name = "AnalysisBot"
+rootProject.name = "Macaw"
 

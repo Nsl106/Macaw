@@ -1,10 +1,10 @@
-package dev.expo.analysisbot.tbainterface
+package dev.expo.macaw.tbainterface
 
 import com.google.gson.Gson
 import com.google.gson.JsonElement
-import dev.expo.analysisbot.AnalysisBot
-import dev.expo.analysisbot.tbadata.ChargedUpMatch.ChargedUpMatch
-import dev.expo.analysisbot.tbadata.Team.Team
+import dev.expo.macaw.Macaw
+import dev.expo.macaw.tbadata.ChargedUpMatch.ChargedUpMatch
+import dev.expo.macaw.tbadata.Team.Team
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
@@ -25,7 +25,7 @@ object TBA {
 
         val client = OkHttpClient()
 
-        val request = Request.Builder().url(url).header("X-TBA-Auth-Key", AnalysisBot.config.tbaApiKey).build()
+        val request = Request.Builder().url(url).header("X-TBA-Auth-Key", Macaw.config.tbaApiKey).build()
 
         val response = client.newCall(request).execute()
 

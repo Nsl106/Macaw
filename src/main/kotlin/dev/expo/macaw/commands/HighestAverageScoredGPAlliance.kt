@@ -1,10 +1,10 @@
-package dev.expo.analysisbot.commands
+package dev.expo.macaw.commands
 
-import dev.expo.analysisbot.tbadata.ChargedUpMatch.ChargedUpMatch
-import dev.expo.analysisbot.tbainterface.Alliance
-import dev.expo.analysisbot.tbainterface.JsonInterface
-import dev.expo.analysisbot.tbainterface.TBA
-import dev.expo.analysisbot.tbainterface.allianceOf
+import dev.expo.macaw.tbadata.ChargedUpMatch.ChargedUpMatch
+import dev.expo.macaw.tbainterface.Alliance
+import dev.expo.macaw.tbainterface.JsonInterface
+import dev.expo.macaw.tbainterface.TBA
+import dev.expo.macaw.tbainterface.allianceOf
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent

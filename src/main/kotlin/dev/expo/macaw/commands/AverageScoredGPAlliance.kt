@@ -1,34 +1,30 @@
-package dev.expo.analysisbot.commands
+package dev.expo.macaw.commands
 
-import dev.expo.analysisbot.tbadata.ChargedUpMatch.ChargedUpMatch
-import dev.expo.analysisbot.tbainterface.Alliance
-import dev.expo.analysisbot.tbainterface.JsonInterface
-import dev.expo.analysisbot.tbainterface.TBA
-import dev.expo.analysisbot.tbainterface.allianceOf
+import dev.expo.macaw.tbadata.ChargedUpMatch.ChargedUpMatch
+import dev.expo.macaw.tbainterface.Alliance
+import dev.expo.macaw.tbainterface.JsonInterface
+import dev.expo.macaw.tbainterface.TBA
+import dev.expo.macaw.tbainterface.allianceOf
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent
 import net.dv8tion.jda.api.hooks.ListenerAdapter
+import net.dv8tion.jda.api.interactions.commands.Command
 import net.dv8tion.jda.api.interactions.commands.OptionType
 import net.dv8tion.jda.api.interactions.commands.build.Commands
+import net.dv8tion.jda.api.interactions.commands.build.OptionData
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData
 import java.awt.Color
 
 
-object TotalScoredGPAlliance : ListenerAdapter() {
+object AverageScoredGPAlliance : ListenerAdapter() {
     override fun onSlashCommandInteraction(event: SlashCommandInteractionEvent) {
-        if (event.name != "totalgpalliance" || event.options[0] == null) return
-
+        if (event.name != "averagegpalliance" || event.options[0] == null) return
         val teamNumber = event.options[0].asInt
 
-        val emptyArray = arrayOf(
-            arrayOf(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-            arrayOf(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-            arrayOf(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-        )
-        val auto = cloneArray(emptyArray)
-        val teleop = cloneArray(emptyArray)
-        val total = cloneArray(emptyArray)
+        var avgAuto = 0
+        var avgTeleop = 0
+        var avgTotal = 0
 
         val eventKey = event.getOption("eventname")?.asString?.let { TBA.getEventKey(it, 2023) }
 
@@ -38,7 +34,12 @@ object TotalScoredGPAlliance : ListenerAdapter() {
             TBA.getJson("team/frc$teamNumber/matches/2023")
         }.asJsonArray
 
-
+        val levels = when (event.getOption("row")?.asString) {
+            "hybrid" -> 2..2
+            "mid" -> 1..1
+            "top" -> 0..0
+            else -> 0..2
+        }
 
         for (matchData in allMatches) {
             val match = ChargedUpMatch()
@@ -63,18 +64,18 @@ object TotalScoredGPAlliance : ListenerAdapter() {
                 teleopScores = arrayOf(teleopData.t, teleopData.m, teleopData.b)
             }
 
-            for (i in 0..2) {
+            for (i in levels) {
                 for (j in 0..8) {
                     val autoGPState = autoScores[i][j]
                     val teleopGPState = teleopScores[i][j]
                     if (autoGPState != "None") {
-                        auto[i][j] += 1.0
+                        avgAuto += 1
                         // Counter the fact that the teleop scores count everything scored in auto as well
-                        teleop[i][j] -= 1.0
+                        avgTeleop -= 1
                     }
                     if (teleopGPState != "None") {
-                        teleop[i][j] += 1.0
-                        total[i][j] += 1.0
+                        avgTeleop += 1
+                        avgTotal += 1
                     }
                 }
             }
@@ -83,18 +84,18 @@ object TotalScoredGPAlliance : ListenerAdapter() {
         val matchesPlayed = allMatches.size()
 
         val embed = EmbedBuilder()
-        arrayToEmbed(auto, "Auto", embed)
-        arrayToEmbed(teleop, "Tele", embed)
-        arrayToEmbed(total, "Total", embed)
-        arrayToEmbed(averageArray(total, matchesPlayed), "Avg", embed)
+        embed.addField("Auto", "```fix\n${(avgAuto.toDouble() / matchesPlayed).format()}```", false)
+        embed.addField("Teleop", "```fix\n${(avgTeleop.toDouble() / matchesPlayed).format()}```", false)
+        embed.addField("Total", "```fix\n${(avgTotal.toDouble() / matchesPlayed).format()}```", false)
 
         embed.setImage("https://frcavatars.herokuapp.com/get_image?team=$teamNumber")
-        embed.setTitle("Alliance GP totals for team $teamNumber")
+        embed.setTitle("Alliance GP average for ${TBA.teamNameFromKey("frc$teamNumber")}")
         embed.setColor(Color(0x3fa3cc))
 
         val description = StringBuilder()
         description.append("Total game pieces scored by alliances including team $teamNumber\n")
         description.append("Matches Played: $matchesPlayed\n")
+        description.append("Row Analyzed: ${event.getOption("row")?.asString?.uppercase()}\n")
         event.getOption("eventname")?.asString?.let { description.append("Event Name: $it") }
 
         embed.setDescription(description.toString())
@@ -103,7 +104,7 @@ object TotalScoredGPAlliance : ListenerAdapter() {
     }
 
     override fun onCommandAutoCompleteInteraction(event: CommandAutoCompleteInteractionEvent) {
-        if (!(event.name == "totalgpalliance" && event.focusedOption.name == "eventname")) return
+        if (!(event.name == "averagegpalliance" && event.focusedOption.name == "eventname")) return
 
         val events = TBA.getJson("team/frc${event.options[0].asInt}/events/2023/simple").asJsonArray
 
@@ -120,56 +121,28 @@ object TotalScoredGPAlliance : ListenerAdapter() {
 
     fun getSlashCommand(): SlashCommandData {
         val command = Commands.slash(
-            "totalgpalliance", "Gets the total game pieces scored by alliances including a specified team"
+            "averagegpalliance", "Gets the total game pieces scored by alliances including a specified team"
         )
 
         command.addOption(OptionType.INTEGER, "teamnum", "Team Number to get data of", true)
+        command.addOptions(
+            OptionData(OptionType.STRING, "row", "Row of game pieces", true).addChoices(
+                Command.Choice("Hybrid", "hybrid"),
+                Command.Choice("Mid", "mid"),
+                Command.Choice("Top", "top"),
+                Command.Choice("All", "all")
+            )
+        )
         command.addOption(OptionType.STRING, "eventname", "Name of an event to get data from", false, true)
+
         return command
     }
+}
 
-    private fun arrayToEmbed(array: Array<Array<Double>>, description: String, builder: EmbedBuilder) {
-        val sb = StringBuilder()
-        sb.append("```fix\n")
-        sb.append("${doubleArrayToString(array[0])}\n")
-        sb.append("${doubleArrayToString(array[1])}\n")
-        sb.append("${doubleArrayToString(array[2])}\n")
-        sb.append("```")
-
-        builder.addField(description, sb.toString(), false)
-    }
-
-    private fun cloneArray(array: Array<Array<Double>>): Array<Array<Double>> {
-        val output = arrayOf<Array<Double>>(arrayOf(), arrayOf(), arrayOf())
-        for (i in array.indices) {
-            output[i] = array[i].copyOf()
-        }
-        return output
-    }
-
-    private fun averageArray(array: Array<Array<Double>>, matchCount: Int): Array<Array<Double>> {
-        val output = cloneArray(array)
-        for (i in output.indices) {
-            for (j in output[i].indices) {
-                output[i][j] /= matchCount.toDouble()
-            }
-        }
-        return output
-    }
-
-    private fun doubleArrayToString(array: Array<Double>): String {
-        val sb = StringBuilder()
-
-        for (i in array) {
-            var num = i.toString()
-            if (num.substring(0, num.indexOf(".")).length == 1) num = "0$num"
-            if (num.length > 4) num = num.substring(0, 5)
-            if (num.substring(num.indexOf(".")).length == 2) num = "${num}0"
-            sb.append(num)
-            sb.append("|")
-        }
-
-        return "[${sb.toString().removeSuffix("|")}]"
-    }
-
+private fun Double.format(): String {
+    var num = this.toString()
+    if (num.substring(0, num.indexOf(".")).length == 1) num = "0$num"
+    if (num.length > 4) num = num.substring(0, 5)
+    if (num.substring(num.indexOf(".")).length == 2) num = "${num}0"
+    return num
 }
