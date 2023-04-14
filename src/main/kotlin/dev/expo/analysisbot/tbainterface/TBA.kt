@@ -4,6 +4,7 @@ import com.google.gson.Gson
 import com.google.gson.JsonElement
 import dev.expo.analysisbot.AnalysisBot
 import dev.expo.analysisbot.tbadata.ChargedUpMatch.ChargedUpMatch
+import dev.expo.analysisbot.tbadata.Team.Team
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
@@ -33,6 +34,12 @@ object TBA {
 
     fun getJson(field: String): JsonElement {
         return Gson().fromJson(getJsonString(field), JsonElement::class.java)
+    }
+
+    fun teamNameFromKey(key: String): String {
+        val team = Team()
+        JsonToPojo.fill("team/$key", team)
+        return team.nickname
     }
 }
 

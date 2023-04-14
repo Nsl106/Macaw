@@ -1,5 +1,6 @@
 package dev.expo.analysisbot
 
+import dev.expo.analysisbot.commands.AverageScoredGPAlliance
 import dev.expo.analysisbot.commands.Ping
 import dev.expo.analysisbot.commands.TotalScoredGPAlliance
 import dev.expo.analysisbot.config.Config
@@ -12,11 +13,12 @@ object AnalysisBot {
 
 fun main() {
     val jda = JDABuilder.createDefault(AnalysisBot.config.discordToken)
-        .addEventListeners(Ping, TotalScoredGPAlliance).enableIntents(GatewayIntent.MESSAGE_CONTENT)
+        .addEventListeners(Ping, TotalScoredGPAlliance, AverageScoredGPAlliance)
+        .enableIntents(GatewayIntent.MESSAGE_CONTENT)
         .build()
         .awaitReady()
 
     jda.getGuildById(1094468997396824194L)?.updateCommands()?.addCommands(
-        TotalScoredGPAlliance.getSlashCommand()
+        TotalScoredGPAlliance.getSlashCommand(), AverageScoredGPAlliance.getSlashCommand()
     )?.queue()
 }
