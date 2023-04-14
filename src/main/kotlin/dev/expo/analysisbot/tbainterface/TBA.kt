@@ -38,7 +38,7 @@ object TBA {
 
     fun teamNameFromKey(key: String): String {
         val team = Team()
-        JsonToPojo.fill("team/$key", team)
+        JsonInterface.fill("team/$key", team)
         return team.nickname
     }
 }

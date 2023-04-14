@@ -2,7 +2,7 @@ package dev.expo.analysisbot.commands
 
 import dev.expo.analysisbot.tbadata.ChargedUpMatch.ChargedUpMatch
 import dev.expo.analysisbot.tbainterface.Alliance
-import dev.expo.analysisbot.tbainterface.JsonToPojo
+import dev.expo.analysisbot.tbainterface.JsonInterface
 import dev.expo.analysisbot.tbainterface.TBA
 import dev.expo.analysisbot.tbainterface.allianceOf
 import net.dv8tion.jda.api.EmbedBuilder
@@ -43,7 +43,7 @@ object AverageScoredGPAlliance : ListenerAdapter() {
 
         for (matchData in allMatches) {
             val match = ChargedUpMatch()
-            JsonToPojo.populate(matchData.asJsonObject, match)
+            JsonInterface.populate(matchData.asJsonObject, match)
 
             val alliance = match.allianceOf(teamNumber)
 
@@ -51,16 +51,16 @@ object AverageScoredGPAlliance : ListenerAdapter() {
             val teleopScores: Array<List<String>>
 
             if (alliance == Alliance.BLUE) {
-                val autoData = match.scoreBreakdown.blue.autoCommunity
+                val autoData = match.scoreBreakdown?.blue?.autoCommunity ?: continue
                 autoScores = arrayOf(autoData.t, autoData.m, autoData.b)
 
-                val teleopData = match.scoreBreakdown.blue.teleopCommunity
+                val teleopData = match.scoreBreakdown?.blue?.teleopCommunity ?: continue
                 teleopScores = arrayOf(teleopData.t, teleopData.m, teleopData.b)
             } else {
-                val autoData = match.scoreBreakdown.red.autoCommunity
+                val autoData = match.scoreBreakdown?.red?.autoCommunity ?: continue
                 autoScores = arrayOf(autoData.t, autoData.m, autoData.b)
 
-                val teleopData = match.scoreBreakdown.red.teleopCommunity
+                val teleopData = match.scoreBreakdown?.red?.teleopCommunity ?: continue
                 teleopScores = arrayOf(teleopData.t, teleopData.m, teleopData.b)
             }
 
