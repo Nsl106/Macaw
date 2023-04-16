@@ -9,7 +9,7 @@ import net.dv8tion.jda.api.JDABuilder
 import net.dv8tion.jda.api.requests.GatewayIntent
 
 object Macaw {
-    val config = Config.load()
+    val config = Config.getConfig()
 }
 
 fun main() {
@@ -24,4 +24,7 @@ fun main() {
         AverageScoredGPAlliance.getSlashCommand(),
         HighestAverageScoredGPAlliance.getSlashCommand()
     )?.queue()
+
+//    JsonInterface.generateClass("match/2023azgl_f1m1", "ChargedUpMatch")
+//    JsonInterface.generateClass("team/frc498", "Team")
 }
